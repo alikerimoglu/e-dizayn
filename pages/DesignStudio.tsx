@@ -21,7 +21,6 @@ import {
 import { Product, GeneratedVariation } from '../types';
 import { CreateProductModal } from '../components/DesignStudio/CreateProductModal';
 import { VariationsPool } from '../components/DesignStudio/VariationsPool';
-import { uploadImageToServer } from '../services/imageService';
 
 interface DesignStudioProps {
   products: Product[];
@@ -42,13 +41,13 @@ export const DesignStudio = forwardRef<DesignStudioHandle, DesignStudioProps>(({
   const [currentBaseImageIndex, setCurrentBaseImageIndex] = useState(0);
   const baseImage = baseImageQueue[currentBaseImageIndex] || null;
 
-  const [printQueue, setPrintQueue] = useState<string[]>([]);
+  const [printQueue, setPrintQueue] = useState<File[]>([]);
   const [currentPrint, setCurrentPrint] = useState<string | null>(null);
   const [generatedVariations, setGeneratedVariations] = useState<GeneratedVariation[]>([]);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(window.innerWidth >= 1280);
   
+  // Ürün oluşturma modal state
   const [isCreateProductModalOpen, setIsCreateProductModalOpen] = useState(false);
   const [creationStep, setCreationStep] = useState<'type' | 'subtype' | 'select' | 'details'>('type');
   const [creationMode, setCreationMode] = useState<'single' | 'multi-individual' | 'multi-batch'>('single');
@@ -139,46 +138,28 @@ export const DesignStudio = forwardRef<DesignStudioHandle, DesignStudioProps>(({
     });
   };
 
-  const handleBaseImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBaseImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setIsUploading(true);
-      try {
-          const files = Array.from(e.target.files) as File[];
-          const uploadPromises = files.map(file => uploadImageToServer(file));
-          const uploadedUrls = await Promise.all(uploadPromises);
-          setBaseImageQueue(prev => [...prev, ...uploadedUrls]);
-      } catch (err) {
-          alert("Görseller yüklenemedi.");
-      } finally {
-          setIsUploading(false);
-      }
+      const newImages = Array.from(e.target.files).map(file => URL.createObjectURL(file as File));
+      setBaseImageQueue(prev => [...prev, ...newImages]);
     }
   };
 
-  const loadPrint = async (url: string) => {
+  const loadPrint = async (file: File) => {
+    let url = URL.createObjectURL(file);
     const processedUrl = await performBackgroundRemoval(url);
     setCurrentPrint(processedUrl);
     setPrintTransform({ x: 0, y: 0, scale: 0.5, rotate: 0, opacity: 1 });
   };
 
-  const handlePrintUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePrintUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setIsUploading(true);
-      try {
-          const files = Array.from(e.target.files) as File[];
-          const uploadPromises = files.map(file => uploadImageToServer(file));
-          const uploadedUrls = await Promise.all(uploadPromises);
-          
-          if (!currentPrint) {
-            loadPrint(uploadedUrls[0]);
-            setPrintQueue(prev => [...prev, ...uploadedUrls.slice(1)]);
-          } else {
-            setPrintQueue(prev => [...prev, ...uploadedUrls]);
-          }
-      } catch (err) {
-          alert("Baskılar yüklenemedi.");
-      } finally {
-          setIsUploading(false);
+      const files = Array.from(e.target.files) as File[];
+      if (!currentPrint) {
+        loadPrint(files[0]);
+        setPrintQueue(prev => [...prev, ...files.slice(1)]);
+      } else {
+        setPrintQueue(prev => [...prev, ...files]);
       }
     }
   };
@@ -449,8 +430,8 @@ export const DesignStudio = forwardRef<DesignStudioHandle, DesignStudioProps>(({
                  <button onClick={removeBackground} title="Arkaplanı Kaldır" disabled={isRemovingBg || !baseImage} className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl disabled:opacity-30 transition-all border border-red-100">
                     {isRemovingBg ? <Loader2 className="w-4 h-4 animate-spin"/> : <Scissors className="w-4 h-4" />}
                  </button>
-                 <button disabled={isUploading} onClick={() => fileInputRef.current?.click()} className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all border border-gray-200 disabled:opacity-50">
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />}
+                 <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all border border-gray-200">
+                    <Upload className="w-4 h-4" />
                     <input ref={fileInputRef} type="file" multiple hidden accept="image/*" onChange={handleBaseImageUpload} />
                  </button>
                  <button onClick={() => setIsRightPanelOpen(!isRightPanelOpen)} className="xl:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-all">
@@ -581,11 +562,11 @@ export const DesignStudio = forwardRef<DesignStudioHandle, DesignStudioProps>(({
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
-                    <div onClick={() => !isUploading && printInputRef.current?.click()} className={`border-2 border-dashed border-gray-100 rounded-[32px] p-8 flex flex-col items-center justify-center text-gray-400 transition-all cursor-pointer group bg-gray-50/30 ${isUploading ? 'opacity-50 cursor-wait' : 'hover:border-blue-300 hover:bg-blue-50/20 hover:text-blue-600'}`}>
+                    <div onClick={() => printInputRef.current?.click()} className="border-2 border-dashed border-gray-100 rounded-[32px] p-8 flex flex-col items-center justify-center text-gray-400 hover:border-blue-300 hover:bg-blue-50/20 hover:text-blue-600 transition-all cursor-pointer group bg-gray-50/30">
                         <div className="w-14 h-14 bg-white rounded-[24px] flex items-center justify-center shadow-xl mb-4 group-hover:scale-105 transition-transform ring-4 ring-gray-50">
-                            {isUploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <Plus className="w-7 h-7" />}
+                            <Plus className="w-7 h-7" />
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.1em] text-center leading-relaxed">{isUploading ? 'YÜKLENİYOR...' : 'LOGONU VEYA DESENİNİ\nYÜKLEMEK İÇİN TIKLA'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.1em] text-center leading-relaxed">LOGONU VEYA DESENİNİ<br/>YÜKLEMEK İÇİN TIKLA</span>
                         <input ref={printInputRef} type="file" multiple hidden accept="image/*" onChange={handlePrintUpload} />
                     </div>
 
@@ -607,7 +588,7 @@ export const DesignStudio = forwardRef<DesignStudioHandle, DesignStudioProps>(({
                 </div>
 
                 <div className="p-5 border-t border-gray-100 bg-gray-50/50 space-y-2.5 shrink-0">
-                    <button onClick={handleSaveToPool} disabled={!baseImage || !currentPrint || isUploading} className={`w-full py-4 rounded-[20px] font-black text-[11px] uppercase tracking-[0.2em] text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${!baseImage || !currentPrint || isUploading ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-500/30'}`}><Save className="w-4 h-4" /> HAVUZA KAYDET</button>
+                    <button onClick={handleSaveToPool} disabled={!baseImage || !currentPrint} className={`w-full py-4 rounded-[20px] font-black text-[11px] uppercase tracking-[0.2em] text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${!baseImage || !currentPrint ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-500/30'}`}><Save className="w-4 h-4" /> HAVUZA KAYDET</button>
                     <button onClick={() => { setIsCreateProductModalOpen(true); setCreationStep('type'); }} disabled={generatedVariations.length === 0} className={`w-full py-4 rounded-[20px] font-black text-[11px] uppercase tracking-[0.2em] text-white shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${generatedVariations.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-red-600 hover:shadow-orange-500/30'}`}><PackagePlus className="w-4 h-4" /> ÜRÜN OLUŞTUR</button>
                 </div>
             </div>

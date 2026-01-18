@@ -74,3 +74,11 @@ export interface GeneratedVariation {
     filters: any;
   }
 }
+
+// Added missing MediaItem interface required by AdminPanel.tsx
+export interface MediaItem {
+  id: string;
+  url: string;
+  uploadedBy: string;
+  timestamp: number;
+}

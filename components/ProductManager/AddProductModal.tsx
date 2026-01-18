@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { X, ImageIcon, UploadCloud, Plus, ChevronLeft, TurkishLira, Package, ArrowRight, AlertTriangle, CheckCircle2, Search, Loader2 } from 'lucide-react';
 import { Product } from '../../types';
-import { uploadImageToServer } from '../../services/imageService';
+import { uploadImageToServer } from '../../services/uploadService';
 
 interface AddProductModalProps { 
   isOpen: boolean; 
@@ -28,16 +28,20 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setIsUploading(true);
-            try {
-                const files = Array.from(e.target.files) as File[];
-                const uploadPromises = files.map(file => uploadImageToServer(file));
-                const uploadedUrls = await Promise.all(uploadPromises);
-                setImagePool(prev => [...prev, ...uploadedUrls]);
-            } catch (err) {
-                alert("Bazı resimler yüklenemedi.");
-            } finally {
-                setIsUploading(false);
+            const files = Array.from(e.target.files) as File[];
+            const newUrls: string[] = [];
+
+            for (const file of files) {
+                const serverUrl = await uploadImageToServer(file);
+                if (serverUrl) {
+                    newUrls.push(serverUrl);
+                } else {
+                    alert(`${file.name} yüklenemedi!`);
+                }
             }
+
+            setImagePool(prev => [...prev, ...newUrls]);
+            setIsUploading(false);
         }
     };
 
@@ -131,36 +135,40 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                     {step === 'select' ? (
                       <div className="space-y-8 animate-fadeIn">
                           <div className="mb-8">
-                              {(imagePool.length === 0 && !isUploading) ? (
+                              {imagePool.length === 0 ? (
                                   <button 
                                       onClick={() => fileInputRef.current?.click()}
+                                      disabled={isUploading}
                                       className="w-full h-64 border-4 border-dashed border-gray-100 rounded-3xl flex flex-col items-center justify-center text-gray-400 bg-gray-50/50 hover:bg-blue-50/30 hover:border-blue-200 hover:text-blue-500 transition-all group"
                                   >
-                                      <div className="p-6 bg-white rounded-full shadow-lg mb-4 group-hover:scale-110 transition-transform">
-                                          <UploadCloud className="w-12 h-12" />
-                                      </div>
-                                      <h3 className="text-lg font-black uppercase tracking-widest mb-1">Görsel Havuzu Boş</h3>
-                                      <p className="text-xs font-bold opacity-60">Dosyaları seçmek için bu alana tıklayın veya sürükleyin</p>
+                                      {isUploading ? (
+                                          <div className="flex flex-col items-center">
+                                              <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
+                                              <p className="text-sm font-black uppercase tracking-widest text-blue-600">Resimler Yükleniyor...</p>
+                                          </div>
+                                      ) : (
+                                          <>
+                                              <div className="p-6 bg-white rounded-full shadow-lg mb-4 group-hover:scale-110 transition-transform">
+                                                  <UploadCloud className="w-12 h-12" />
+                                              </div>
+                                              <h3 className="text-lg font-black uppercase tracking-widest mb-1">Görsel Havuzu Boş</h3>
+                                              <p className="text-xs font-bold opacity-60">Dosyaları seçmek için bu alana tıklayın veya sürükleyin</p>
+                                          </>
+                                      )}
                                   </button>
                               ) : (
                                   <div className="space-y-4">
                                       <div className="flex justify-between items-center px-1">
                                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Yüklenen Görseller ({imagePool.length})</span>
                                           <button 
-                                              disabled={isUploading}
                                               onClick={() => fileInputRef.current?.click()}
-                                              className="text-xs font-black text-blue-600 hover:text-blue-800 flex items-center gap-1.5 disabled:opacity-50"
+                                              disabled={isUploading}
+                                              className="text-xs font-black text-blue-600 hover:text-blue-800 flex items-center gap-1.5"
                                           >
-                                              {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Plus className="w-3.5 h-3.5" />}
-                                              DAHA FAZLA YÜKLE
+                                              {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} DAHA FAZLA YÜKLE
                                           </button>
                                       </div>
                                       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
-                                          {isUploading && (
-                                              <div className="aspect-square rounded-2xl border-4 border-dashed border-blue-200 flex items-center justify-center bg-blue-50">
-                                                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                                              </div>
-                                          )}
                                           {imagePool.map((src, i) => (
                                               <div 
                                                   key={i} 
