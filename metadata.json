@@ -1,0 +1,7 @@
+{
+  "name": "E dizayn",
+  "description": "Tüm pazaryerlerini tek bir ekrandan yönetin. Stok, fiyat, sipariş ve fatura süreçlerinizi Elnoya ile otomatikleştirin.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
