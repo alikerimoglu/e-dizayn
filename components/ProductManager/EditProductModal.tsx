@@ -1,6 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Edit3, Save, Loader2, TurkishLira, Package, Plus, Sparkles } from 'lucide-react';
 import { Product } from '../../types';
+import { uploadImageToServer } from '../../services/imageService';
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -13,6 +15,7 @@ interface EditProductModalProps {
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, product, onClose, onSave, isProcessing, onRegenerate }) => {
   const [formData, setFormData] = useState<Product>({ ...product });
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,17 +38,26 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, prod
     }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files) as File[];
-      const urls = files.map(f => URL.createObjectURL(f));
-      const currentImages = formData.images || (formData.image ? [formData.image] : []);
-      const combined = [...currentImages, ...urls].slice(0, 8);
-      setFormData(prev => ({
-        ...prev,
-        images: combined,
-        image: combined[0]
-      }));
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setIsUploading(true);
+      try {
+          const files = Array.from(e.target.files) as File[];
+          const uploadPromises = files.map(file => uploadImageToServer(file));
+          const uploadedUrls = await Promise.all(uploadPromises);
+          
+          const currentImages = formData.images || (formData.image ? [formData.image] : []);
+          const combined = [...currentImages, ...uploadedUrls].slice(0, 8);
+          setFormData(prev => ({
+            ...prev,
+            images: combined,
+            image: combined[0]
+          }));
+      } catch (err) {
+          alert("Resimler yüklenemedi.");
+      } finally {
+          setIsUploading(false);
+      }
     }
   };
 
@@ -77,7 +89,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, prod
                       </button>
                     </div>
                   ))}
-                  {images.length < 8 && (
+                  {images.length < 8 && !isUploading && (
                     <button 
                       onClick={() => fileInputRef.current?.click()}
                       className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-500 transition-all"
@@ -85,6 +97,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, prod
                       <Plus className="w-6 h-6" />
                       <input ref={fileInputRef} type="file" multiple hidden accept="image/*" onChange={handleFileUpload} />
                     </button>
+                  )}
+                  {isUploading && (
+                      <div className="aspect-square border-2 border-blue-100 bg-blue-50 rounded-xl flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                      </div>
                   )}
                </div>
             </div>
@@ -187,10 +204,11 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, prod
           <button onClick={onClose} className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-gray-200 transition-all">İPTAL</button>
           <button 
             onClick={() => onSave(formData)} 
-            disabled={isProcessing}
+            disabled={isProcessing || isUploading}
             className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Save className="w-4 h-4" /> DEĞİŞİKLİKLERİ KAYDET
+            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {isUploading ? 'YÜKLENİYOR...' : 'DEĞİŞİKLİKLERİ KAYDET'}
           </button>
         </div>
       </div>
